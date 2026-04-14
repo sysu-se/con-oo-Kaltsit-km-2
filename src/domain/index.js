@@ -1,11 +1,25 @@
 class Sudoku {
-  constructor(grid) {
+  constructor(grid, fixed = null) {
     // 防御性深拷贝，防止外部修改影响内部
     this._grid = grid.map(row => [...row]);
+    // 记录初始给定的数字位置（不可修改）
+    // 如果是从JSON恢复，使用传入的fixed；否则根据grid计算
+    this._fixed = fixed ? fixed.map(row => [...row]) : 
+                  grid.map(row => row.map(val => val !== 0));
   }
 
   getGrid() {
     return this._grid.map(row => [...row]);
+  }
+
+  // 新增：获取固定标记网格
+  getFixedGrid() {
+    return this._fixed.map(row => [...row]);
+  }
+
+  // 新增：判断某个位置是否为初始给定数字
+  isFixed(row, col) {
+    return this._fixed[row][col];
   }
 
   guess(move) {
@@ -16,6 +30,11 @@ class Sudoku {
       throw new Error(`Position out of bounds: (${row}, ${col})`);
     }
     
+    // 新增：保护初始给定数字不被修改
+    if (this._fixed[row][col] && value !== 0 && value !== null) {
+      return; // 静默返回，不修改初始数字
+    }
+
     // 允许的值：1-9，或0/null表示清空
     if (value !== null && value !== 0 && (value < 1 || value > 9)) {
       throw new Error(`Invalid value: ${value}`);
@@ -25,12 +44,94 @@ class Sudoku {
     this._grid[row][col] = value === null ? 0 : value;
   }
 
+  // 新增：获取所有冲突的格子坐标
+  // 返回 Set，包含 "row,col" 格式的字符串
+  getInvalidCells() {
+    const invalid = new Set();
+    
+    // 检查行
+    for (let r = 0; r < 9; r++) {
+      const seen = new Map();
+      for (let c = 0; c < 9; c++) {
+        const val = this._grid[r][c];
+        if (val !== 0) {
+          if (seen.has(val)) {
+            const [pr, pc] = seen.get(val);
+            invalid.add(`${r},${c}`);
+            invalid.add(`${pr},${pc}`);
+          } else {
+            seen.set(val, [r, c]);
+          }
+        }
+      }
+    }
+    
+    // 检查列
+    for (let c = 0; c < 9; c++) {
+      const seen = new Map();
+      for (let r = 0; r < 9; r++) {
+        const val = this._grid[r][c];
+        if (val !== 0) {
+          if (seen.has(val)) {
+            const [pr, pc] = seen.get(val);
+            invalid.add(`${r},${c}`);
+            invalid.add(`${pr},${pc}`);
+          } else {
+            seen.set(val, [r, c]);
+          }
+        }
+      }
+    }
+    
+    // 检查3x3宫
+    for (let boxR = 0; boxR < 3; boxR++) {
+      for (let boxC = 0; boxC < 3; boxC++) {
+        const seen = new Map();
+        const startR = boxR * 3;
+        const startC = boxC * 3;
+        
+        for (let r = startR; r < startR + 3; r++) {
+          for (let c = startC; c < startC + 3; c++) {
+            const val = this._grid[r][c];
+            if (val !== 0) {
+              if (seen.has(val)) {
+                const [pr, pc] = seen.get(val);
+                invalid.add(`${r},${c}`);
+                invalid.add(`${pr},${pc}`);
+              } else {
+                seen.set(val, [r, c]);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return invalid;
+  }
+
+  // 新增：判断是否已完成（填满且无冲突）
+  isWon() {
+    // 检查是否填满
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (this._grid[r][c] === 0) return false;
+      }
+    }
+    // 检查是否有冲突
+    return this.getInvalidCells().size === 0;
+  }
+
   clone() {
-    return new Sudoku(this._grid);
+    const newSudoku = new Sudoku(this._grid, this._fixed);
+    return newSudoku;
   }
 
   toJSON() {
-    return this._grid;
+    return {
+      grid: this._grid,
+      fixed: this._fixed
+    };
   }
 
   toString() {
