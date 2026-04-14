@@ -222,7 +222,22 @@ export function createSudoku(input) {
 }
 
 export function createSudokuFromJSON(json) {
-  return new Sudoku(json);
+  // 防御性检查
+  if (!json) {
+    throw new Error('Invalid JSON: null or undefined');
+  }
+  
+  // 旧格式：纯数组 [[...], [...]]
+  if (Array.isArray(json)) {
+    return new Sudoku(json);
+  }
+  
+  // 新格式：{grid: [[...]], fixed: [[...]]}
+  if (json.grid && Array.isArray(json.grid)) {
+    return new Sudoku(json.grid, json.fixed);
+  }
+  
+  throw new Error('Invalid JSON format for Sudoku');
 }
 
 export function createGame({ sudoku }) {
@@ -231,14 +246,18 @@ export function createGame({ sudoku }) {
 
 
 export function createGameFromJSON(json) {
+  if (!json || !json.sudoku) {
+    throw new Error('Invalid JSON for Game');
+  }
+
   const sudoku = createSudokuFromJSON(json.sudoku);
   const game = new Game({ sudoku });
   
   // 恢复历史
-  if (json.history) {
+  if (json.history && Array.isArray(json.history)) {
     game._history = json.history.map(h => createSudokuFromJSON(h));
   }
-  if (json.redoStack) {
+  if (json.redoStack && Array.isArray(json.redoStack)) {
     game._redoStack = json.redoStack.map(h => createSudokuFromJSON(h));
   }
   
